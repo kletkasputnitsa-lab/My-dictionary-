@@ -6,21 +6,23 @@
 <title>Мой словарь</title>
 <style>
   body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 10px; background: #f5f5f5; }
-  h1 { color: #333; }
+  h1 { color: #333; font-size: 22px; }
   .form { background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-  .form input, .form select { padding: 8px; margin: 4px 4px 4px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-  .form input[type="text"] { width: 180px; }
-  .form button { padding: 9px 18px; background: #4CAF50; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  .form input, .form select { padding: 8px; margin: 4px 4px 4px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+  .form input[type="text"] { width: 100%; max-width: 200px; }
+  .form button { padding: 10px 18px; background: #4CAF50; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
   .form button:hover { background: #45a049; }
-  .search { margin-bottom: 10px; }
-  .search input { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px; }
+  .filters { background: #fff; padding: 12px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .filters select, .filters input { padding: 8px; margin: 4px 4px 4px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; width: 100%; max-width: 220px; }
   table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 13px; }
   th { background: #4CAF50; color: #fff; }
   tr:hover { background: #f9f9f9; }
-  .del { color: #e74c3c; cursor: pointer; font-weight: bold; }
-  .footer { margin-top: 15px; color: #666; font-size: 14px; }
-  .footer button { padding: 6px 12px; margin-left: 10px; background: #888; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+  .del { color: #e74c3c; cursor: pointer; font-weight: bold; font-size: 18px; }
+  .footer { margin-top: 15px; color: #666; font-size: 14px; padding-bottom: 30px; }
+  .footer button { padding: 8px 14px; margin: 5px 5px 0 0; background: #888; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  .footer button:hover { background: #666; }
+  .empty { color: #999; text-align: center; padding: 20px; }
 </style>
 </head>
 <body>
@@ -33,12 +35,18 @@
   <input type="text" id="pos" placeholder="Часть речи (v, n, adj)">
   <input type="text" id="perevod" placeholder="Перевод">
   <input type="text" id="tema" placeholder="Тема">
-  <input type="text" id="example" placeholder="Пример" style="width:250px">
+  <input type="text" id="example" placeholder="Пример">
   <button onclick="addWord()">Добавить</button>
 </div>
 
-<div class="search">
+<div class="filters">
   🔍 <input type="text" id="search" placeholder="Поиск по слову или переводу" oninput="render()">
+  <select id="filterTema" onchange="render()">
+    <option value="">Все темы</option>
+  </select>
+  <select id="filterPos" onchange="render()">
+    <option value="">Все части речи</option>
+  </select>
 </div>
 
 <table>
@@ -57,7 +65,8 @@
 </table>
 
 <div class="footer">
-  Всего слов: <span id="count">0</span>
+  Показано: <span id="shown">0</span> из <span id="count">0</span>
+  <br>
   <button onclick="exportCSV()">Экспорт CSV</button>
   <button onclick="clearAll()">Очистить всё</button>
 </div>
@@ -81,6 +90,7 @@
 
     words.push({ word: w, trans: t, pos: p, perevod: r, tema: m, example: e });
     save();
+    updateFilters();
     render();
 
     document.getElementById('word').value = '';
@@ -95,19 +105,46 @@
     if (confirm('Удалить слово?')) {
       words.splice(i, 1);
       save();
+      updateFilters();
       render();
     }
   }
 
+  function updateFilters() {
+    const temas = [...new Set(words.map(w => w.tema).filter(Boolean))].sort();
+    const poses = [...new Set(words.map(w => w.pos).filter(Boolean))].sort();
+
+    const selTema = document.getElementById('filterTema');
+    const selPos = document.getElementById('filterPos');
+
+    const curTema = selTema.value;
+    const curPos = selPos.value;
+
+    selTema.innerHTML = '<option value="">Все темы</option>' +
+      temas.map(t => `<option value="${t}">${t}</option>`).join('');
+    selPos.innerHTML = '<option value="">Все части речи</option>' +
+      poses.map(p => `<option value="${p}">${p}</option>`).join('');
+
+    if (temas.includes(curTema)) selTema.value = curTema;
+    if (poses.includes(curPos)) selPos.value = curPos;
+  }
+
   function render() {
-    const q = document.getElementById('search').value.toLowerCase();
+    const q = document.getElementById('search').value.toLowerCase().trim();
+    const ft = document.getElementById('filterTema').value;
+    const fp = document.getElementById('filterPos').value;
+
     const tbody = document.getElementById('tbody');
     tbody.innerHTML = '';
+    let shown = 0;
 
     words.forEach((item, i) => {
       const text = (item.word + ' ' + item.perevod + ' ' + item.tema).toLowerCase();
       if (q && !text.includes(q)) return;
+      if (ft && item.tema !== ft) return;
+      if (fp && item.pos !== fp) return;
 
+      shown++;
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><b>${item.word}</b></td>
@@ -121,7 +158,12 @@
       tbody.appendChild(tr);
     });
 
+    if (shown === 0 && words.length > 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">Ничего не найдено</td></tr>';
+    }
+
     document.getElementById('count').textContent = words.length;
+    document.getElementById('shown').textContent = shown;
   }
 
   function exportCSV() {
@@ -141,10 +183,12 @@
     if (confirm('Удалить ВСЕ слова? Это нельзя отменить.')) {
       words = [];
       save();
+      updateFilters();
       render();
     }
   }
 
+  updateFilters();
   render();
 </script>
 
