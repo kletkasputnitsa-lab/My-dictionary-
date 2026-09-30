@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Мой словарь</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 10px; background: #f5f5f5; }
+  h1 { color: #333; }
+  .form { background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .form input, .form select { padding: 8px; margin: 4px 4px 4px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+  .form input[type="text"] { width: 180px; }
+  .form button { padding: 9px 18px; background: #4CAF50; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  .form button:hover { background: #45a049; }
+  .search { margin-bottom: 10px; }
+  .search input { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+  th { background: #4CAF50; color: #fff; }
+  tr:hover { background: #f9f9f9; }
+  .del { color: #e74c3c; cursor: pointer; font-weight: bold; }
+  .footer { margin-top: 15px; color: #666; font-size: 14px; }
+  .footer button { padding: 6px 12px; margin-left: 10px; background: #888; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>📖 Мой словарь английского</h1>
+
+<div class="form">
+  <input type="text" id="word" placeholder="Слово">
+  <input type="text" id="trans" placeholder="Транскрипция">
+  <input type="text" id="pos" placeholder="Часть речи (v, n, adj)">
+  <input type="text" id="perevod" placeholder="Перевод">
+  <input type="text" id="tema" placeholder="Тема">
+  <input type="text" id="example" placeholder="Пример" style="width:250px">
+  <button onclick="addWord()">Добавить</button>
+</div>
+
+<div class="search">
+  🔍 <input type="text" id="search" placeholder="Поиск по слову или переводу" oninput="render()">
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Слово</th>
+      <th>Транскрипция</th>
+      <th>Часть речи</th>
+      <th>Перевод</th>
+      <th>Тема</th>
+      <th>Пример</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<div class="footer">
+  Всего слов: <span id="count">0</span>
+  <button onclick="exportCSV()">Экспорт CSV</button>
+  <button onclick="clearAll()">Очистить всё</button>
+</div>
+
+<script>
+  let words = JSON.parse(localStorage.getItem('myDictionary') || '[]');
+
+  function save() {
+    localStorage.setItem('myDictionary', JSON.stringify(words));
+  }
+
+  function addWord() {
+    const w = document.getElementById('word').value.trim();
+    const t = document.getElementById('trans').value.trim();
+    const p = document.getElementById('pos').value.trim();
+    const r = document.getElementById('perevod').value.trim();
+    const m = document.getElementById('tema').value.trim();
+    const e = document.getElementById('example').value.trim();
+
+    if (!w || !r) { alert('Заполните хотя бы слово и перевод'); return; }
+
+    words.push({ word: w, trans: t, pos: p, perevod: r, tema: m, example: e });
+    save();
+    render();
+
+    document.getElementById('word').value = '';
+    document.getElementById('trans').value = '';
+    document.getElementById('pos').value = '';
+    document.getElementById('perevod').value = '';
+    document.getElementById('tema').value = '';
+    document.getElementById('example').value = '';
+  }
+
+  function del(i) {
+    if (confirm('Удалить слово?')) {
+      words.splice(i, 1);
+      save();
+      render();
+    }
+  }
+
+  function render() {
+    const q = document.getElementById('search').value.toLowerCase();
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+
+    words.forEach((item, i) => {
+      const text = (item.word + ' ' + item.perevod + ' ' + item.tema).toLowerCase();
+      if (q && !text.includes(q)) return;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><b>${item.word}</b></td>
+        <td>${item.trans}</td>
+        <td>${item.pos}</td>
+        <td>${item.perevod}</td>
+        <td>${item.tema}</td>
+        <td>${item.example}</td>
+        <td><span class="del" onclick="del(${i})">✕</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('count').textContent = words.length;
+  }
+
+  function exportCSV() {
+    if (words.length === 0) { alert('Словарь пуст'); return; }
+    let csv = 'Слово;Транскрипция;Часть речи;Перевод;Тема;Пример\n';
+    words.forEach(w => {
+      csv += `"${w.word}";"${w.trans}";"${w.pos}";"${w.perevod}";"${w.tema}";"${w.example}"\n`;
+    });
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'словарь.csv';
+    a.click();
+  }
+
+  function clearAll() {
+    if (confirm('Удалить ВСЕ слова? Это нельзя отменить.')) {
+      words = [];
+      save();
+      render();
+    }
+  }
+
+  render();
+</script>
+
+</body>
+</html>
